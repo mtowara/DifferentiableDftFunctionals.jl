@@ -1,3 +1,4 @@
+using Infiltrator
 import ForwardDiff: Dual
 
 # TODO Based on this type do some generic things like use spin-scaling relations
@@ -114,43 +115,29 @@ function potential_terms(func::Functional{:lda}, ρ::AbstractMatrix{T}) where {T
     s_ρ, n_p = size(ρ)
     TT = promote_type(T, parameter_type(func))
 
-    e  = similar(ρ, TT, n_p)
-    Vρ = similar(ρ, TT, s_ρ, n_p)
-    @views for i = 1:n_p
-        potential_terms!(e[i:i], Vρ[:, i], func, ρ[:, i])
+    e = mapreduce(hcat, ρ[:, i] for i = 1:n_p ) do ρi
+        energy(func,ρi)
+    end
+    Vρ = mapreduce(hcat, ρ[:, i] for i = 1:n_p ) do ρi
+        ForwardDiff.gradient(ρ -> energy(func,ρ), ρi)
     end
     (; e, Vρ)
-end
-function potential_terms!(e, Vρ, func::Functional{:lda}, ρ::AbstractVector{T}) where {T}
-    res = ForwardDiff.gradient!(DiffResults.DiffResult(zero(eltype(e)), Vρ),
-                                ρ -> energy(func, ρ), ρ)
-    e .= DiffResults.value(res)
-    nothing
 end
 
 function kernel_terms(func::Functional{:lda}, ρ::AbstractMatrix{T}) where {T}
     @assert has_energy(func)
     s_ρ, n_p = size(ρ)
-    TT = promote_type(T, parameter_type(func))
 
-    e   = similar(ρ, TT, n_p)
-    Vρ  = similar(ρ, TT, s_ρ, n_p)
-    Vρρ = similar(ρ, TT, s_ρ, s_ρ, n_p)
-
-    # TODO Needed to make forward-diff work with !isbits floating-point types (e.g. BigFloat)
-    Vρ  .= zero(T)
-    Vρρ .= zero(T)
-
-    @views for i = 1:n_p
-        kernel_terms!(e[i:i], Vρ[:, i], Vρρ[:, :, i], func, ρ[:, i])
+    e = mapreduce(hcat, ρ[:, i] for i = 1:n_p ) do ρi
+        energy(func,ρi)
+    end
+    Vρ = mapreduce(hcat, ρ[:, i] for i = 1:n_p ) do ρi
+        ForwardDiff.gradient(ρ -> energy(func,ρ), ρi)
+    end
+    Vρρ = mapreduce(hcat, ρ[:, i] for i = 1:n_p ) do ρi
+        ForwardDiff.hessian(ρ -> energy(func,ρ), ρi)
     end
     (; e, Vρ, Vρρ)
-end
-function kernel_terms!(e, Vρ, Vρρ, func::Functional{:lda}, ρ::AbstractVector{T}) where {T}
-    res = ForwardDiff.hessian!(DiffResults.DiffResult(zero(eltype(e)), Vρ, Vρρ),
-                               ρ -> energy(func, ρ), ρ)
-    e .= DiffResults.value(res)
-    nothing
 end
 
 function energy(func::Functional{:lda}, ρ::AbstractVector{T}) where {T}
@@ -171,24 +158,17 @@ function potential_terms(func::Functional{:gga}, ρ::AbstractMatrix{T},
     @assert has_energy(func)  # Otherwise custom implementation of this function needed
     s_ρ, n_p = size(ρ)
     s_σ = size(σ, 1)
-    TT = promote_type(T, U, parameter_type(func))
 
-    e  = similar(ρ, TT, n_p)
-    Vρ = similar(ρ, TT, s_ρ, n_p)
-    Vσ = similar(ρ, TT, s_σ, n_p)
-    @views for i = 1:n_p
-        potential_terms!(e[i:i], Vρ[:, i], Vσ[:, i], func, ρ[:, i], σ[:, i])
+    e = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        energy(func, ρi, σi)
+    end
+    Vρ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.gradient(ρ -> energy(func, ρ, σi), ρi)
+    end
+    Vσ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.gradient(σ -> energy(func, ρi, σ), σi)
     end
     (; e, Vρ, Vσ)
-end
-function potential_terms!(e, Vρ, Vσ, func::Functional{:gga},
-                          ρ::AbstractVector, σ::AbstractVector)
-    res = ForwardDiff.gradient!(DiffResults.DiffResult(zero(eltype(e)), Vρ),
-                                ρ -> energy(func, ρ, σ), ρ)
-    ForwardDiff.gradient!(DiffResults.DiffResult(zero(eltype(e)), Vσ),
-                          σ -> energy(func, ρ, σ), σ)
-    e .= DiffResults.value(res)
-    nothing
 end
 
 function kernel_terms(func::Functional{:gga}, ρ::AbstractMatrix{T},
@@ -217,20 +197,29 @@ function kernel_terms(func::Functional{:gga}, ρ::AbstractMatrix{T},
                       Vρρ[:, :, i], Vρσ[:, :, i], Vσσ[:, :, i],
                       func, ρ[:, i], σ[:, i])
     end
+
+    e = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        energy(func, ρi, σi)
+    end
+    Vρ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.gradient(ρ -> energy(func, ρ, σi), ρi)
+    end
+    Vσ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.gradient(σ -> energy(func, ρi, σ), σi)
+    end
+    Vρρ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.hessian(ρ -> energy(func, ρ, σi), ρi)
+    end
+    Vρσ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        # mixed Hessian
+        ForwardDiff.jacobian(
+            σ -> ForwardDiff.gradient(ρ -> energy(func, ρ, σ), ρi), σi)
+    end
+    Vσσ = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
+        ForwardDiff.hessian(σ -> energy(func, ρi, σ), σi)
+    end
+
     (; e, Vρ, Vσ, Vρρ, Vρσ, Vσσ)
-end
-function kernel_terms!(e, Vρ, Vσ, Vρρ, Vρσ, Vσσ, func::Functional{:gga},
-                       ρ::AbstractVector, σ::AbstractVector)
-    res = ForwardDiff.hessian!(DiffResults.DiffResult(zero(eltype(e)), Vρ, Vρρ),
-                               ρ -> energy(func, ρ, σ), ρ)
-    res = ForwardDiff.hessian!(DiffResults.DiffResult(zero(eltype(e)), Vσ, Vσσ),
-                               σ -> energy(func, ρ, σ), σ)
-
-    dedρ = σ -> ForwardDiff.gradient(ρ -> energy(func, ρ, σ), ρ)
-    ForwardDiff.jacobian!(Vρσ, dedρ, σ)
-
-    e .= DiffResults.value(res)
-    nothing
 end
 
 function energy(func::Functional{:gga}, ρ::AbstractVector{T},
