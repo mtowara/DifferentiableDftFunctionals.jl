@@ -1,3 +1,5 @@
+import ChainRulesCore: ignore_derivatives
+
 struct PbeCorrelation{Tlda,CA} <:
        Functional{:gga,:c} where {Tlda,CA<:ComponentArray{<:Number}}
     parameters::CA
@@ -24,8 +26,8 @@ end
 
 function energy(pbe::PbeCorrelation, ρ::T, σ::U) where {T<:Number,U<:Number}
     TT = promote_type(T, U, parameter_type(pbe))
-    β = TT(pbe.parameters.β)
-    γ = TT(pbe.parameters.γ)
+    β = TT( ignore_derivatives( pbe.parameters.β ) )
+    γ = TT( ignore_derivatives( pbe.parameters.γ ) )
 
     # Spin-scaling factor with ζ spin polarization.
     # Yue Wang and John P. Perdew. Phys. Rev. B 43, 8911 (1991).
@@ -49,6 +51,10 @@ end
 # Concrete functionals
 #
 
+# hacks for Zygote https://github.com/jonniedie/ComponentArrays.jl/issues/126
+ca_prototype = ComponentArray(β=0.0, γ=0.0)
+const ax_c_pbe = getaxes(ca_prototype)
+
 """
 Standard PBE correlation.
 Perdew, Burke, Ernzerhof 1996 (DOI: 10.1103/PhysRevLett.77.3865)
@@ -56,7 +62,7 @@ Perdew, Burke, Ernzerhof 1996 (DOI: 10.1103/PhysRevLett.77.3865)
 function DftFunctional(::Val{:gga_c_pbe})
     β = 0.06672455060314922
     γ = (1 - log(2)) / π^2
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_pbe)
+    PbeCorrelation(ComponentArray([β, γ], ax_c_pbe), :gga_c_pbe)
 end
 
 """
@@ -67,7 +73,7 @@ function DftFunctional(::Val{:gga_c_xpbe})
     β = 0.089809  # Fitted constants, Table I
     α = 0.197363  # Fitted constants, Table I
     γ = β^2 / 2α
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_xpbe)
+    PbeCorrelation(ComponentArray(([β, γ], ax_c_pbe)), :gga_c_xpbe)
 end
 
 """
@@ -77,7 +83,7 @@ Perdew, Ruzsinszky, Csonka and others 2008 (DOI 10.1103/physrevlett.100.136406)
 function DftFunctional(::Val{:gga_c_pbe_sol})
     β = 0.046  # Page 3, left column below figure 1
     γ = (1 - log(2)) / π^2
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_pbe_sol)
+    PbeCorrelation(ComponentArray([β, γ], ax_c_pbe), :gga_c_pbe_sol)
 end
 
 """
@@ -88,7 +94,7 @@ function DftFunctional(::Val{:gga_c_apbe})
     μ = 0.260   # p. 1, right column, bottom
     β = 3μ / π^2
     γ = (1 - log(2)) / π^2  # like in PBE
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_apbe)
+    PbeCorrelation(ComponentArray([β, γ], ax_c_pbe), :gga_c_apbe)
 end
 
 """
@@ -99,7 +105,7 @@ function DftFunctional(::Val{:gga_c_pbe_mol})
     # β made to cancel self-interaction error in hydrogen
     β = 0.08384             # p. 4, right column, first paragraph
     γ = (1 - log(2)) / π^2  # like in PBE
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_pbe_mol)
+    PbeCorrelation(ComponentArray([β, γ], ax_c_pbe), :gga_c_pbe_mol)
 end
 
 """
@@ -109,5 +115,5 @@ Sarmiento-Perez, Silvana, Marques 2015 (DOI 10.1021/acs.jctc.5b00529)
 function DftFunctional(::Val{:gga_c_pbefe})
     β = 0.043                    # Fitted constants, Table I
     γ = 0.031090690869654895034  # Fitted constants, Table I
-    PbeCorrelation(ComponentArray(; β, γ), :gga_c_pbefe)
+    PbeCorrelation(ComponentArray([β, γ], ax_c_pbe), :gga_c_pbefe)
 end

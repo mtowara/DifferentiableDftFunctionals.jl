@@ -192,12 +192,6 @@ function kernel_terms(func::Functional{:gga}, ρ::AbstractMatrix{T},
     Vρσ .= zero(TT)
     Vσσ .= zero(TT)
 
-    @views for i = 1:n_p
-        kernel_terms!(e[i:i], Vρ[:, i], Vσ[:, i],
-                      Vρρ[:, :, i], Vρσ[:, :, i], Vσσ[:, :, i],
-                      func, ρ[:, i], σ[:, i])
-    end
-
     e = mapreduce(hcat, (ρ[:, i], σ[:, i]) for i = 1:n_p ) do (ρi, σi)
         energy(func, ρi, σi)
     end
