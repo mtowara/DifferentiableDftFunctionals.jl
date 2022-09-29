@@ -1,4 +1,3 @@
-using Infiltrator
 import ForwardDiff: Dual
 
 # TODO Based on this type do some generic things like use spin-scaling relations
