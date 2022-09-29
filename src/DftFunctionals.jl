@@ -1,4 +1,4 @@
-module DftFunctionals
+module DifferentiableDftFunctionals
 using ForwardDiff
 using ComponentArrays
 
@@ -16,7 +16,7 @@ include("DftFunctional.jl")
 include("functionals/lda.jl")
 include("functionals/gga_x_pbe.jl")
 include("functionals/gga_c_pbe.jl")
-export DftFunctional
+export DifferentiableDftFunctional
 export LdaExchange, LdaCorrelationVwn, LdaCorrelationPw, PbeExchange, PbeCorrelation
 
 end
