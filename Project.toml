@@ -1,5 +1,5 @@
-name = "DftFunctionals"
-uuid = "6bd331d2-b28d-4fd3-880e-1a1c7f37947f"
+name = "DifferentiableDftFunctionals"
+uuid = "013b1ec0-400b-11ed-2639-c1472304b416"
 authors = ["Michael F. Herbst <info@michael-herbst.com>"]
 version = "0.2.2"
 
